@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from database import Base, engine
-from api import usuarios, laboratorios, servicios, tickets
+from api import usuarios, laboratorios, servicios, tickets, auth
 
 # Crear tablas en la base de datos
 Base.metadata.create_all(bind=engine)
@@ -12,6 +12,7 @@ app = FastAPI(
 )
 
 # Registrar routers
+app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(laboratorios.router)
 app.include_router(servicios.router)
