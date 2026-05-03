@@ -7,7 +7,9 @@ from security.auth import get_current_user, require_scopes
 from security.scopes import get_scopes_for_role
 from models.usuario import Usuario
 
+
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+
 
 # Tabla de transiciones permitidas
 TRANSICIONES_PERMITIDAS = {
@@ -201,21 +203,63 @@ def actualizar_ticket(
 ):
    """
    Actualiza campos de un ticket (no el estado).
-   Solo el solicitante o admin pueden modificar.
+   - Solicitante: puede modificar titulo, descripcion, prioridad
+   - Responsable técnico: puede asignar (id_asignado, id_responsable)
+   - Admin: puede modificar todo
    """
    ticket = crud.get_ticket_by_id(db, id_ticket=id_ticket)
    if not ticket:
        raise HTTPException(status_code=404, detail="Ticket no encontrado")
-  
-   # Solo el solicitante o admin pueden modificar
-   if user.rol != "admin" and ticket.id_solicitante != user.id_usuario:
-       raise HTTPException(
-           status_code=403,
-           detail="Solo el solicitante puede modificar este ticket"
+
+
+   # Admin puede modificar todo
+   if user.rol == "admin":
+       return crud.update_ticket(
+           db=db,
+           id_ticket=id_ticket,
+           **ticket_data.model_dump(exclude_unset=True)
        )
-  
-   return crud.update_ticket(
-       db=db,
-       id_ticket=id_ticket,
-       **ticket_data.model_dump(exclude_unset=True)
+
+
+   # Responsable técnico puede asignar técnicos
+   if user.rol == "responsable_tecnico":
+       # Solo permitir asignar (id_asignado o id_responsable)
+       allowed_fields = {"id_asignado", "id_responsable"}
+       update_data = ticket_data.model_dump(exclude_unset=True)
+       if not all(k in allowed_fields for k in update_data.keys()):
+           raise HTTPException(
+               status_code=403,
+               detail="El responsable técnico solo puede asignar técnicos al ticket"
+           )
+       return crud.update_ticket(
+           db=db,
+           id_ticket=id_ticket,
+           **update_data
+       )
+
+
+   # Solicitante puede modificar campos generales
+   if ticket.id_solicitante == user.id_usuario:
+       # No permitir que el solicitante modifique asignaciones
+       update_data = ticket_data.model_dump(exclude_unset=True)
+       blocked_fields = {"id_asignado", "id_responsable"}
+       if any(k in update_data for k in blocked_fields):
+           raise HTTPException(
+               status_code=403,
+               detail="El solicitante no puede modificar la asignación del ticket"
+           )
+       return crud.update_ticket(
+           db=db,
+           id_ticket=id_ticket,
+           **update_data
+       )
+
+
+   raise HTTPException(
+       status_code=403,
+       detail="No tiene permiso para modificar este ticket"
    )
+
+
+
+

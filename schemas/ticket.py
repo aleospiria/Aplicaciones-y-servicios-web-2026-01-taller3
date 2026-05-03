@@ -20,6 +20,8 @@ class TicketUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
     prioridad: Optional[str] = Field(None, pattern="^(baja|media|alta)$")
+    id_asignado: Optional[int] = None
+    id_responsable: Optional[int] = None
     observacion_responsable: Optional[str] = None
     observacion_tecnico: Optional[str] = None
 
